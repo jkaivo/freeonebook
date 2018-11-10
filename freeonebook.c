@@ -12,20 +12,6 @@
 
 #define ENABLE_VALUE "1"
 
-void enable_displays(void)
-{
-	int left = open(ENABLE_LEFT_PATH, O_WRONLY);
-	int right = open(ENABLE_RIGHT_PATH, O_WRONLY);
-	
-	printf("enabling left display\n");
-	write(left, ENABLE_VALUE, sizeof(ENABLE_VALUE));
-	printf("enabling right display\n");
-	write(right, ENABLE_VALUE, sizeof(ENABLE_VALUE));
-
-	close(left);
-	close(right);
-}
-
 void gpio_write(int port, const char *field, const char *value)
 {
 	char path[256];
@@ -33,6 +19,12 @@ void gpio_write(int port, const char *field, const char *value)
 	int fd = open(path, O_WRONLY);
 	write(fd, value, strlen(value));
 	close(fd);
+}
+
+void enable_displays(void)
+{
+	gpio_write(5, "value", "1");
+	gpio_write(4, "value", "1");
 }
 
 void gpio_init(void)
