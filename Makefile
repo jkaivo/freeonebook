@@ -1,3 +1,6 @@
 CC=arm-linux-gnueabihf-gcc
 
-freeonebook: freeonebook.c
+freeonebook: freeonebook.o
+
+clean:
+	rm -f freeonebook *.o
