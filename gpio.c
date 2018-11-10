@@ -26,10 +26,7 @@ int gpio_get(int port)
 	int fd = gpio_open(port, "value", O_RDONLY);
 	read(fd, &c, 1);
 	close(fd);
-	if (c == '0') {
-		return 0;
-	}
-	return 1;
+	return c != '0';
 }
 
 void gpio_set(int port)
