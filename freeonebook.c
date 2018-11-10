@@ -4,13 +4,18 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define BUTTON_SPECIAL		89
+#define BUTTON_PREVBOOK		91
+#define BUTTON_PREVPAGE		92
+#define BUTTON_NEXTPAGE		95
+#define BUTTON_NEXTCHAPTER	96
+#define BUTTON_NEXTBOOK		100
+
 #define GPIO_BASEDIR	"/sys/class/gpio"
 #define GPIO_EXPORT	GPIO_BASEDIR "/export"
 
-#define ENABLE_LEFT_PATH	GPIO_BASEDIR "/gpio5/value"
-#define ENABLE_RIGHT_PATH	GPIO_BASEDIR "/gpio4/value"
-
-#define ENABLE_VALUE "1"
+#define ENABLE_LEFT_DISPLAY	5
+#define ENABLE_RIGHT_DISPLAY	4
 
 void gpio_write(int port, const char *field, const char *value)
 {
@@ -24,8 +29,8 @@ void gpio_write(int port, const char *field, const char *value)
 
 void enable_displays(void)
 {
-	gpio_write(5, "value", "1");
-	gpio_write(4, "value", "1");
+	gpio_write(ENABLE_LEFT_DISPLAY, "value", "1");
+	gpio_write(ENABLE_RIGHT_DISPLAY, "value", "1");
 }
 
 void gpio_init(void)
