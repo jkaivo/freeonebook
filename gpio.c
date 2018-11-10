@@ -10,8 +10,8 @@
 #define GPIO_EXPORT	GPIO_BASEDIR "/export"
 
 #define GPIO_IN		"in"
-#define GPIO_INIT_LOW	"GPIO_INIT_LOW"
-#define GPIO_INIT_HIGH	"GPIO_INIT_HIGH"
+#define GPIO_INIT_LOW	"low"
+#define GPIO_INIT_HIGH	"high"
 
 static int gpio_open(int port, const char *field, int flags)
 {
@@ -50,7 +50,7 @@ static void gpio_enable(int export_fd, int port, const char *state)
 {
 	dprintf(export_fd, "%d", port);
 	int fd = gpio_open(port, "direction", O_WRONLY);
-	write(fd, "state", strlen(state));
+	write(fd, "direction", strlen(state));
 	close(fd);
 }
 
