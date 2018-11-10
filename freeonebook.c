@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -26,7 +27,7 @@ void enable_displays(void)
 void gpio_init(void)
 {
 	struct {
-		uint_8 port;
+		uint8_t port;
 		enum { in, out } direction;
 	} ports[] = {
 		{ 100, in },	/* 4a58 */
