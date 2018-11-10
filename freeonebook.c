@@ -124,6 +124,7 @@ void gpio_init(void)
 		{ 148, out, 0 },
 		{ 149, out, 0 },
 	};
+
 	int gpio_export = open(GPIO_EXPORT, O_WRONLY);
 	for (int i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
 		printf("enabling port %d\n", ports[i].port);
