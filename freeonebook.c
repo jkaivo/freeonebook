@@ -15,10 +15,11 @@
 void gpio_write(int port, const char *field, const char *value)
 {
 	char path[256];
-	sprintf(path, "%s/gpio%d/%s", GPIO_BASEDIR, field);
+	sprintf(path, "%s/gpio%d/%s", GPIO_BASEDIR, port, field);
 	int fd = open(path, O_WRONLY);
-	write(fd, value, strlen(value));
+	ssize_t n = write(fd, value, strlen(value));
 	close(fd);
+	printf("write '%s' to '%s' => %d\n", value, path, n);
 }
 
 void enable_displays(void)
@@ -34,21 +35,21 @@ void gpio_init(void)
 		enum { in, out } direction;
 		uint8_t value;
 	} ports[] = {
-		{ 100, in },
-		{ 91, in },
-		{ 96, in },
-		{ 89, in },
-			{ 95, in },
-			{ 92, in },
+		{ 100, in, 0 },
+		{ 91, in, 0 },
+		{ 96, in, 0 },
+		{ 89, in, 0 },
+			{ 95, in, 0 },
+			{ 92, in, 0 },
 				{ 108, out, 0 },
 				{ 94, out, 0 },
 				{ 101, out, 0 },	/* 95, 92 */
-		{ 5, out },
-		{ 4, out },
-		{ 93, in },
+		{ 5, out, 0 },
+		{ 4, out, 0 },
+		{ 93, in, 0 },
 		{ 98, out, 1 },
 				{ 90, out, 1 },			/* 108, 94, 101 */
-		{ 88, in },
+		{ 88, in, 0 },
 		{ 0, out, 0 },
 		{ 1, out, 0 },
 		{ 2, out, 0 },
@@ -126,17 +127,17 @@ void gpio_init(void)
 	};
 
 	int gpio_export = open(GPIO_EXPORT, O_WRONLY);
-	for (int i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
+	for (size_t i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
 		printf("enabling port %d\n", ports[i].port);
 		dprintf(gpio_export, "%d", ports[i].port);
 	}
 	close(gpio_export);
 
-	for (int i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
+	for (size_t i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
 		gpio_write(ports[i].port, "direction", ports[i].direction == in ? "in" : "out");
 	}
 
-	for (int i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
+	for (size_t i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
 		if (ports[i].direction == out) {
 			gpio_write(ports[i].port, "value", ports[i].value == 1 ? "1" : "0");
 		}
@@ -145,6 +146,7 @@ void gpio_init(void)
 
 int main(int argc, char *argv[])
 {
+	(void)argc; (void)argv;
 	gpio_init();
 	enable_displays();
 
