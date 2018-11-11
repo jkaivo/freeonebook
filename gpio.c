@@ -29,6 +29,7 @@ int gpio_get(int port)
 	int fd = gpio_open(port, "value", O_RDONLY);
 	read(fd, &c, 1);
 	close(fd);
+
 	return c != '0';
 }
 
@@ -48,8 +49,6 @@ void gpio_clear(int port)
 
 static void gpio_enable_multi(int export_fd, int port, const char *state)
 {
-	printf("enabling GPIO %d, state '%s'\n", port, state);
-
 	dprintf(export_fd, "%d", port);
 	int fd = gpio_open(port, "direction", O_WRONLY);
 	write(fd, "direction", strlen(state));
@@ -162,20 +161,28 @@ void gpio_init(void)
 struct gpio_watcher {
 	int port;
 	void (*fn)(int);
+	char lastvalue;
 };
 
 void *gpio_watch_thread(void *arg)
 {
 	struct gpio_watcher *w = arg;
 	int fd = gpio_open(w->port, "value", O_RDONLY);
+	read(fd, &(w->lastvalue), 1);
+
 	for (;;) {
 		struct pollfd fds[] = { { fd, POLLPRI | POLLERR, 0 } };
-		if (poll(fds, 1, -1) == 1) {
-			if (gpio_get(w->port)) {
+		if ((poll(fds, 1, -1) == 1) && (fds[0].revents & POLLPRI)) {
+			char value;
+			lseek(fd, 0, SEEK_SET);
+			read(fd, &value, 1);
+			if (value != w->lastvalue) {
 				w->fn(w->port);
+				w->lastvalue = value;
 			}
 		}
 	}
+
 	close(fd);
 	return NULL;
 }
@@ -184,13 +191,15 @@ void gpio_watch(int port, void (*fn)(int))
 {
 	printf("starting watcher for %d\n", port);
 	gpio_enable(port, "in");
+
 	int edge = gpio_open(port, "edge", O_WRONLY);
 	write(edge, "both", 4);
 	close(edge);
 
-	pthread_t thread;
 	struct gpio_watcher *watcher = malloc(sizeof(*watcher));
 	watcher->port = port;
 	watcher->fn = fn;
+
+	pthread_t thread;
 	pthread_create(&thread, NULL, gpio_watch_thread, watcher);
 }
