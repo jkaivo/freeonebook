@@ -2,11 +2,13 @@ CC=arm-linux-gnueabihf-gcc
 CFLAGS=-Wall -Wextra
 LDFLAGS=-lpthread
 
-freeonebook: freeonebook.o gpio.o
+freeonebook: freeonebook.o gpio.o fb.o
 
-freeonebook.o: freeonebook.c gpio.h
+freeonebook.o: freeonebook.c gpio.h fb.h
 
 gpio.o: gpio.c gpio.h
+
+fb.o: fb.c fb.h
 
 clean:
 	rm -f freeonebook *.o

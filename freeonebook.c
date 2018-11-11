@@ -1,26 +1,20 @@
-#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/mman.h>
 #include <unistd.h>
 
 #include "gpio.h"
+#include "fb.h"
 
 #define FBSIZE (1186848 * 2)
 #define SDPATH "/run/media/mmcblk0p1"
 
-void enable_displays(void)
-{
-	printf("enabling displays\n");
-	gpio_set(ENABLE_LEFT_DISPLAY);
-	gpio_set(ENABLE_RIGHT_DISPLAY);
-}
-
 void halt(void)
 {
 	char *halt[] = { "shutdown", "-h", "now", NULL };
+	fflush(NULL);
+	sync();
 	execvp(halt[0], halt);
 }
 
@@ -75,10 +69,15 @@ void buttonpress(int button)
 
 int main(int argc, char *argv[])
 {
+	printf("starting freeonebook\n");
 	(void)argc; (void)argv;
+	printf("registering atexit() handler\n");
 	atexit(halt);
 
+	printf("initializing gpio\n");
 	gpio_init();
+
+	printf("adding watchers\n");
 	gpio_watch(GPIO_LOWBATTERY, poweroff);
 	gpio_watch(GPIO_SHUTDOWN, poweroff);
 	gpio_watch(BUTTON_SPECIAL, buttonpress);
@@ -88,7 +87,8 @@ int main(int argc, char *argv[])
 	gpio_watch(BUTTON_NEXTCHAPTER, buttonpress);
 	gpio_watch(BUTTON_NEXTBOOK, buttonpress);
 
-	enable_displays();
+	printf("initializing framebuffer\n");
+	fb_init();
 	
 	for (;;) {
 		sleep(INT_MAX);
