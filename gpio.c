@@ -1,6 +1,9 @@
 #include "gpio.h"
 
 #include <fcntl.h>
+#include <poll.h>
+#include <pthread.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,11 +46,20 @@ void gpio_clear(int port)
 	close(fd);
 }
 
-static void gpio_enable(int export_fd, int port, const char *state)
+static void gpio_enable_multi(int export_fd, int port, const char *state)
 {
+	printf("enabling GPIO %d, state '%s'\n", port, state);
+
 	dprintf(export_fd, "%d", port);
 	int fd = gpio_open(port, "direction", O_WRONLY);
 	write(fd, "direction", strlen(state));
+	close(fd);
+}
+
+static void gpio_enable(int port, const char *state)
+{
+	int fd = open(GPIO_EXPORT, O_WRONLY);
+	gpio_enable_multi(fd, port, state);
 	close(fd);
 }
 
@@ -57,21 +69,13 @@ void gpio_init(void)
 		uint8_t port;
 		const char *initstate;
 	} ports[] = {
-		{ 100, GPIO_IN },
-		{ 91, GPIO_IN },
-		{ 96, GPIO_IN },
-		{ 89, GPIO_IN },
-			{ 95, GPIO_IN },
-			{ 92, GPIO_IN },
-				{ 108, GPIO_INIT_LOW },
-				{ 94, GPIO_INIT_LOW },
-				{ 101, GPIO_INIT_LOW },	/* 95, 92 */
+		{ 108, GPIO_INIT_LOW },
+		{ 94, GPIO_INIT_LOW },
+		{ 101, GPIO_INIT_LOW },
 		{ 5, GPIO_INIT_LOW },
 		{ 4, GPIO_INIT_LOW },
-		{ 93, GPIO_IN },
 		{ 98, GPIO_INIT_HIGH },
-				{ 90, GPIO_INIT_HIGH },	/* 108, 94, 101 */
-		{ 88, GPIO_IN },
+		{ 90, GPIO_INIT_HIGH },
 		{ 0, GPIO_INIT_LOW },
 		{ 1, GPIO_INIT_LOW },
 		{ 2, GPIO_INIT_LOW },
@@ -111,7 +115,7 @@ void gpio_init(void)
 		{ 72, GPIO_INIT_LOW },
 		{ 73, GPIO_INIT_LOW },
 		{ 74, GPIO_INIT_LOW },
-				{ 75, GPIO_INIT_LOW },	/* not enabled */
+		{ 75, GPIO_INIT_LOW },
 		{ 78, GPIO_INIT_LOW },
 		{ 79, GPIO_INIT_LOW },
 		{ 86, GPIO_INIT_LOW },
@@ -150,7 +154,43 @@ void gpio_init(void)
 
 	int gpio_export = open(GPIO_EXPORT, O_WRONLY);
 	for (size_t i = 0; i < sizeof(ports) / sizeof(ports[0]); i++) {
-		gpio_enable(gpio_export, ports[i].port, ports[i].initstate);
+		gpio_enable_multi(gpio_export, ports[i].port, ports[i].initstate);
 	}
 	close(gpio_export);
+}
+
+struct gpio_watcher {
+	int port;
+	void (*fn)(int);
+};
+
+void *gpio_watch_thread(void *arg)
+{
+	struct gpio_watcher *w = arg;
+	int fd = gpio_open(w->port, "value", O_RDONLY);
+	for (;;) {
+		struct pollfd fds[] = { { fd, POLLPRI | POLLERR, 0 } };
+		if (poll(fds, 1, -1) == 1) {
+			if (gpio_get(w->port)) {
+				w->fn(w->port);
+			}
+		}
+	}
+	close(fd);
+	return NULL;
+}
+
+void gpio_watch(int port, void (*fn)(int))
+{
+	printf("starting watcher for %d\n", port);
+	gpio_enable(port, "in");
+	int edge = gpio_open(port, "edge", O_WRONLY);
+	write(edge, "both", 4);
+	close(edge);
+
+	pthread_t thread;
+	struct gpio_watcher *watcher = malloc(sizeof(*watcher));
+	watcher->port = port;
+	watcher->fn = fn;
+	pthread_create(&thread, NULL, gpio_watch_thread, watcher);
 }
