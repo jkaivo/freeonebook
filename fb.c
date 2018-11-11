@@ -1,5 +1,7 @@
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -23,73 +25,70 @@ struct imx_epdc_fb_mode {
 	int num_ce;
 };
 
-static char *fbaddr;
+static unsigned char *fbaddr;
+static struct fb_fix_screeninfo fsi;
+static struct fb_var_screeninfo vsi;
 
-void dumpsi(const char *ctl, int io, struct fb_var_screeninfo *si)
+static void dumpvsi(const char *ctl, int io)
 {
 	printf("- %s\n", ctl);
 	printf("\tioctl returned %d\n", io);
-	printf("\txres: %d\n", si->xres);
-	printf("\tyres: %d\n", si->yres);
-	printf("\txres_virtual: %d\n", si->xres_virtual);
-	printf("\tyres_virtual: %d\n", si->yres_virtual);
-	printf("\txoffset: %d\n", si->xoffset);
-	printf("\tyoffset: %d\n", si->yoffset);
-	printf("\tbits_per_pixel: %d\n", si->bits_per_pixel);
-	printf("\tgrayscale: %d\n", si->grayscale);
+	printf("\txres: %d\n", vsi.xres);
+	printf("\tyres: %d\n", vsi.yres);
+	printf("\txres_virtual: %d\n", vsi.xres_virtual);
+	printf("\tyres_virtual: %d\n", vsi.yres_virtual);
+	printf("\txoffset: %d\n", vsi.xoffset);
+	printf("\tyoffset: %d\n", vsi.yoffset);
+	printf("\tbits_per_pixel: %d\n", vsi.bits_per_pixel);
+	printf("\tgrayscale: %d\n", vsi.grayscale);
 }
 
-void dumpfsi(const char *ctl, int io, struct fb_fix_screeninfo *fsi)
+static void dumpfsi(const char *ctl, int io)
 {
 	printf("- %s\n", ctl);
 	printf("\tioctl returned %d\n", io);
-	printf("\tid: %16s\n", fsi->id);
-	printf("\tsmem_len: %d\n", fsi->smem_len);
-	printf("\ttype: %d\n", fsi->type);
-	printf("\ttype_aux: %d\n", fsi->type_aux);
-	printf("\tvisual: %d\n", fsi->visual);
-	printf("\txpanstep: %d\n", fsi->xpanstep);
-	printf("\typanstep: %d\n", fsi->ypanstep);
-	printf("\tywrapstep: %d\n", fsi->ywrapstep);
-	printf("\tline_length: %d\n", fsi->line_length);
-	printf("\tmmio_start: %lu\n", fsi->mmio_start);
-	printf("\tmmio_len: %d\n", fsi->mmio_len);
-	printf("\taccel: %d\n", fsi->accel);
-	printf("\tcapabilities: %d\n", fsi->capabilities);
+	printf("\tid: %16s\n", fsi.id);
+	printf("\tsmem_len: %d\n", fsi.smem_len);
+	printf("\ttype: %d\n", fsi.type);
+	printf("\ttype_aux: %d\n", fsi.type_aux);
+	printf("\tvisual: %d\n", fsi.visual);
+	printf("\txpanstep: %d\n", fsi.xpanstep);
+	printf("\typanstep: %d\n", fsi.ypanstep);
+	printf("\tywrapstep: %d\n", fsi.ywrapstep);
+	printf("\tline_length: %d\n", fsi.line_length);
+	printf("\tmmio_start: %lu\n", fsi.mmio_start);
+	printf("\tmmio_len: %d\n", fsi.mmio_len);
+	printf("\taccel: %d\n", fsi.accel);
+	printf("\tcapabilities: %d\n", fsi.capabilities);
 }
 
 void fb_init(void)
 {
+	/*
 	printf("enabling left display\n");
 	gpio_set(ENABLE_LEFT_DISPLAY);
 	printf("enabling right display\n");
 	gpio_set(ENABLE_RIGHT_DISPLAY);
-
+	*/
 
 	printf("mapping framebuffer...\n");
-	struct fb_var_screeninfo si = { 0 };
 	
 	int fbfd = open("/dev/fb0", O_RDWR);
 
-	struct fb_fix_screeninfo fsi;
 	int io = ioctl(fbfd, FBIOGET_FSCREENINFO, &fsi);
-	dumpfsi("FBIOGET_FSCREENINFO", io, &fsi);
+	dumpfsi("FBIOGET_FSCREENINFO", io);
 
-	io = ioctl(fbfd, FBIOGET_VSCREENINFO, &si);
-	dumpsi("FBIOEGET_VSCREENINFO", io, &si);
+	io = ioctl(fbfd, FBIOGET_VSCREENINFO, &vsi);
+	dumpvsi("FBIOEGET_VSCREENINFO", io);
 
-	si.bits_per_pixel = 8;
-	si.grayscale = 1;
-	si.activate = FB_ACTIVATE_FORCE;
+	vsi.bits_per_pixel = 8;
+	vsi.grayscale = 1;
+	vsi.activate = FB_ACTIVATE_FORCE;
 
-	io = ioctl(fbfd, FBIOPUT_VSCREENINFO, &si); 
-	dumpsi("FBIOPUT_VSCREENINFO", io, &si);
+	io = ioctl(fbfd, FBIOPUT_VSCREENINFO, &vsi); 
+	dumpvsi("FBIOPUT_VSCREENINFO", io);
 
 	fbaddr = mmap(NULL, fsi.smem_len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fbfd, 0);
-
-	for (unsigned int i = 0; i < fsi.smem_len; i++) {
-		fbaddr[i] = i % 2 == 0 ? '\0' : '\xff';
-	}
 
 	close(fbfd);
 	printf("at %p\n", fbaddr);
