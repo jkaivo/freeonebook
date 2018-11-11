@@ -74,9 +74,6 @@ int main(int argc, char *argv[])
 	printf("registering atexit() handler\n");
 	atexit(halt);
 
-	printf("initializing gpio\n");
-	gpio_init();
-
 	printf("adding watchers\n");
 	gpio_watch(GPIO_LOWBATTERY, poweroff);
 	gpio_watch(GPIO_SHUTDOWN, poweroff);
