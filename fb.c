@@ -57,13 +57,11 @@ static void fb_update(int x, int y, int w, int h)
 
 void fb_blank(void)
 {
-	printf("blanking screen\n");
-	fflush(NULL); sync();
 	memset(fb.addr, 0xff, fb.size);
-	fb_update(0, 0, fb.vsi.xres, fb.vsi.yres);
+	fb_update(0, 0, fb.vsi.xres_virtual, fb.vsi.yres_virtual);
 }
 
-void fb_loadimage(const char *path)
+void fb_loadimage(int screen, const char *path)
 {
 	printf("loading image %s\n", path);
 	fflush(NULL); sync();
@@ -87,19 +85,15 @@ void fb_loadimage(const char *path)
 		return;
 	}
 
-	printf("copying image"); fflush(NULL); sync();
-	for (uint32_t i = 0; i < fb.vsi.yres_virtual; i++) {
-		printf("."); fflush(NULL); sync();
-		memcpy(fb.addr + (i * fb.vsi.xres_virtual),
-			img + (i * 936), fb.vsi.xres_virtual);
-	}
-	printf("\ndone\n"); fflush(NULL); sync();
+	printf("copying image..."); fflush(NULL); sync();
+	unsigned char *buffer = fb.addr + (screen * fb.size / 2);
+	memcpy(buffer, img, st.st_size < fb.size ? st.st_size : fb.size);
+	printf("done\n"); fflush(NULL); sync();
 
-	printf("munmap()\n"); fflush(NULL); sync();
 	munmap(img, st.st_size);
 	close(fd);
 
-	fb_update(0, 0, fb.vsi.xres, fb.vsi.yres);
+	fb_update(0, (screen * fb.vsi.yres_virtual / 2), fb.vsi.xres_virtual, fb.vsi.yres_virtual / 2);
 }
 
 void fb_init(void)
@@ -118,4 +112,7 @@ void fb_init(void)
 
 	fb.size = fb.vsi.xres_virtual * fb.vsi.yres_virtual;
 	fb.addr = mmap(NULL, fb.size, PROT_READ | PROT_WRITE, MAP_SHARED, fb.fd, 0);
+
+	fb_update(0, 0, fb.vsi.xres_virtual, fb.vsi.yres_virtual);
+
 }
