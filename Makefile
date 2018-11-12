@@ -1,5 +1,5 @@
 CC=arm-linux-gnueabihf-gcc
-CFLAGS=-Wall -Wextra
+CFLAGS=-Wall -Wextra -I.
 LDFLAGS=-lpthread
 
 freeonebook: freeonebook.o gpio.o fb.o
