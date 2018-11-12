@@ -10,6 +10,10 @@
 #include <linux/mxcfb.h>
 #include <sys/ioctl.h>
 
+#define MAGICKCORE_QUANTUM_DEPTH 8
+#define MAGICKCORE_HDRI_ENABLE 0
+#include <MagickCore/MagickCore.h>
+
 #include "fb.h"
 #include "gpio.h"
 
@@ -66,7 +70,34 @@ void fb_loadimage(int screen, const char *path)
 	printf("loading image %s\n", path);
 	fflush(NULL); sync();
 
-	int fd = open(path, O_RDONLY);
+	ExceptionInfo *exception = AcquireExceptionInfo();
+
+	printf("reading original image\n");
+	ImageInfo *info = CloneImageInfo((ImageInfo*)NULL);
+	strcpy(info->filename, path);
+	Image *images = ReadImage(info, exception);
+
+	printf("resizing\n");
+	Image *original = RemoveFirstImageFromList(&images);
+	Image *resized = ResizeImage(original, fb.vsi.xres, fb.vsi.yres, LanczosFilter, exception);
+	DestroyImage(original);
+
+	printf("rotating\n");
+	Image *rotated = IntegralRotateImage(resized, 3, exception);
+	DestroyImage(rotated);
+
+	printf("writing grayscale\n");
+	AppendImageToList(&images, rotated);
+	strcpy(info->filename, "/tmp/converted.gray");
+	WriteImage(info, images, exception);
+
+	printf("cleaning up\n");
+	DestroyImageList(images);
+	DestroyImage(rotated);
+	DestroyImageInfo(info);
+	DestroyExceptionInfo(exception);
+
+	int fd = open("/tmp/converted.gray", O_RDONLY);
 	if (fd == -1) {
 		printf("not found\n");
 		fflush(NULL);
@@ -98,6 +129,8 @@ void fb_loadimage(int screen, const char *path)
 
 void fb_init(void)
 {
+	MagickCoreGenesis(NULL, MagickFalse);
+
 	fb.fd = open("/dev/fb0", O_RDWR);
 
 	ioctl(fb.fd, FBIOGET_FSCREENINFO, &fb.fsi);
