@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <linux/mxcfb.h>
@@ -11,6 +12,12 @@
 
 #include "fb.h"
 #include "gpio.h"
+
+#define WAVEFORM_MODE_INIT      0x0     /* Screen goes to white (clears) */
+#define WAVEFORM_MODE_DU        0x1     /* Grey->white/grey->black */
+#define WAVEFORM_MODE_GC16      0x2     /* High fidelity (flashing) */
+#define WAVEFORM_MODE_GC4       0x3     /* Lower fidelity */
+#define WAVEFORM_MODE_A2        0x4     /* Fast black/white animation */
 
 static struct {
 	int fd;
@@ -27,7 +34,7 @@ static void fb_update(int x, int y, int w, int h)
 
 	struct mxcfb_update_data data = {
 		.update_mode = UPDATE_MODE_PARTIAL,
-		.waveform_mode = WAVEFORM_MODE_AUTO, /* DU? */
+		.waveform_mode = WAVEFORM_MODE_AUTO,
 		.update_region.left = x,
 		.update_region.top = y,
 		.update_region.width = w,
@@ -36,35 +43,60 @@ static void fb_update(int x, int y, int w, int h)
 		.temp = TEMP_USE_AMBIENT,
 		.flags = 0,
 	};
-	ioctl(fb.fd, MXCFB_SEND_UPDATE, &data);
+	printf("SEND_UPDATE: "); fflush(NULL); sync();
+	int r = ioctl(fb.fd, MXCFB_SEND_UPDATE, &data);
+	printf("%d\n", r); fflush(NULL); sync();
 
 	struct mxcfb_update_marker_data md = {
 		.update_marker = marker,
 	};
-
-	ioctl(fb.fd, MXCFB_WAIT_FOR_UPDATE_COMPLETE, &md);
+	printf("WAIT_FOR_UPDATE_COMPLETE: "); fflush(NULL); sync();
+	r = ioctl(fb.fd, MXCFB_WAIT_FOR_UPDATE_COMPLETE, &md);
+	printf("%d\n", r); fflush(NULL); sync();
 }
 
-static void fb_blank(void)
+void fb_blank(void)
 {
+	printf("blanking screen\n");
+	fflush(NULL); sync();
 	memset(fb.addr, 0xff, fb.size);
 	fb_update(0, 0, fb.vsi.xres, fb.vsi.yres);
 }
 
-static void fb_loadimage(const char *path)
+void fb_loadimage(const char *path)
 {
+	printf("loading image %s\n", path);
+	fflush(NULL); sync();
+
 	int fd = open(path, O_RDONLY);
 	if (fd == -1) {
+		printf("not found\n");
+		fflush(NULL);
+		sync();
 		return;
 	}
 
-	char *img = mmap(NULL, fb.size, PROT_READ, MAP_PRIVATE, fd, 0);
+	struct stat st;
+	fstat(fd, &st);
+
+	char *img = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if (img == MAP_FAILED) {
+		printf("map failed\n");
+		fflush(NULL);
+		sync();
 		return;
 	}
 
-	memcpy(fb.addr, img, fb.size);
-	munmap(img, fb.size);
+	printf("copying image"); fflush(NULL); sync();
+	for (uint32_t i = 0; i < fb.vsi.yres_virtual; i++) {
+		printf("."); fflush(NULL); sync();
+		memcpy(fb.addr + (i * fb.vsi.xres_virtual),
+			img + (i * 936), fb.vsi.xres_virtual);
+	}
+	printf("\ndone\n"); fflush(NULL); sync();
+
+	printf("munmap()\n"); fflush(NULL); sync();
+	munmap(img, st.st_size);
 	close(fd);
 
 	fb_update(0, 0, fb.vsi.xres, fb.vsi.yres);
@@ -72,15 +104,6 @@ static void fb_loadimage(const char *path)
 
 void fb_init(void)
 {
-	/*
-	printf("enabling left display\n");
-	gpio_set(ENABLE_LEFT_DISPLAY);
-	printf("enabling right display\n");
-	gpio_set(ENABLE_RIGHT_DISPLAY);
-	*/
-
-	printf("mapping framebuffer...\n");
-	
 	fb.fd = open("/dev/fb0", O_RDWR);
 
 	ioctl(fb.fd, FBIOGET_FSCREENINFO, &fb.fsi);
@@ -88,37 +111,11 @@ void fb_init(void)
 	ioctl(fb.fd, FBIOGET_VSCREENINFO, &fb.vsi);
 
 	fb.vsi.bits_per_pixel = 8;
-	fb.vsi.grayscale = GRAYSCALE_8BIT_INVERTED;
+	fb.vsi.grayscale = GRAYSCALE_8BIT;
 	fb.vsi.activate = FB_ACTIVATE_FORCE;
 
 	ioctl(fb.fd, FBIOPUT_VSCREENINFO, &fb.vsi);
 
 	fb.size = fb.vsi.xres_virtual * fb.vsi.yres_virtual;
 	fb.addr = mmap(NULL, fb.size, PROT_READ | PROT_WRITE, MAP_SHARED, fb.fd, 0);
-
-	printf("at %p\n", fb.addr);
-
-	int updatemode = AUTO_UPDATE_MODE_REGION_MODE;
-	ioctl(fb.fd, MXCFB_SET_AUTO_UPDATE_MODE, &updatemode);
-
-	/*
-	struct mxcfb_waveform_modes wave = {
-		.mode_init = WAVEFORM_MODE_INIT,
-		.mode_du = WAVEFORM_MODE_DU,
-		.mode_gc4 = WAVEFORM_MODE_GC4,
-		.mode_gc8 = WAVEFORM_MODE_GC16,
-		.mode_gc16 = WAVEFORM_MODE_GC16,
-		.mode_gc32 = WAVEFORM_MODE_GC16,
-	};
-	ioctl(fb.fd, MXCFB_SET_WAVEFORM_MODES, &wave);
-
-	int scheme = UPDATE_SCHEME_QUEUE_AND_MERGE;
-	ioctl(fb.fd, MXCFB_SET_UPDATE_SCHEME, &scheme);
-
-	int powerdelay = 0;
-	ioctl(fb.fd, MXCFB_SET_PWRDOWN_DELAY, &powerdelay);
-	*/
-
-	fb_blank();
-	//fb_loadimage("/run/media/mmcblk0p1/left-screen.dat");
 }
