@@ -12,9 +12,10 @@
 
 void halt(void)
 {
-	char *halt[] = { "shutdown", "-h", "now", NULL };
 	fflush(NULL);
 	sync();
+
+	char *halt[] = { "shutdown", "-h", "now", NULL };
 	execvp(halt[0], halt);
 }
 
@@ -30,6 +31,8 @@ void poweroff(int reason)
 
 	if (reason == GPIO_LOWBATTERY) {
 		printf("low battery\n");
+	} else {
+		fb_blank();
 	}
 
 	exit(0);
@@ -56,15 +59,20 @@ void buttonpress(int button)
 
 	case BUTTON_PREVPAGE:
 		printf("previous page\n");
+		fb_loadimage(SDPATH "/right-screen.dat");
 		break;
 
 	case BUTTON_NEXTPAGE:
 		printf("next page\n");
+		fb_loadimage(SDPATH "/left-screen.dat");
 		break;
 
 	default:
 		printf("button %d pressed\n", button);
 	}
+
+	fflush(NULL);
+	sync();
 }
 
 int main(int argc, char *argv[])
@@ -75,8 +83,8 @@ int main(int argc, char *argv[])
 	atexit(halt);
 
 	printf("adding watchers\n");
-	gpio_watch(GPIO_LOWBATTERY, poweroff);
-	gpio_watch(GPIO_SHUTDOWN, poweroff);
+	//gpio_watch(GPIO_LOWBATTERY, poweroff);
+	//gpio_watch(GPIO_SHUTDOWN, poweroff);
 	gpio_watch(BUTTON_SPECIAL, buttonpress);
 	gpio_watch(BUTTON_PREVBOOK, buttonpress);
 	gpio_watch(BUTTON_PREVPAGE, buttonpress);
@@ -86,6 +94,7 @@ int main(int argc, char *argv[])
 
 	printf("initializing framebuffer\n");
 	fb_init();
+	fb_blank();
 	
 	for (;;) {
 		sleep(INT_MAX);
