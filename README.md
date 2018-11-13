@@ -13,38 +13,12 @@ with:
 
 Image support is provided by ImageMagick, which in turn depends on libpng,
 which in turn depends on zlib. The eOneBook already has dynamic libraries for
-zlib and libpng installed, but you still need them installed in your
-cross-compilation environment so ImageMagick knows they will be there.
+libpng installed, but you still need them installed in your cross-compilation
+environment so ImageMagick knows they will be there. A make target is included
+to simplify the process of installing them. If one or more is already installed
+in your cross-compilation environment, it will be skipped.
 
-#### zlib
-
-    $ wget http://www.zlib.net/zlib-1.2.11.tar.gz
-    $ tar xvzf zlib-1.2.11.tar.gz
-    $ cd zlib-1.2.11
-    $ CHOST=arm-linux-gnueabihf ./configure --prefix=/usr/arm-linux-gnueabihf
-    $ make
-    $ sudo make install
-
-#### libpng
-
-    $ wget https://download.sourceforge.net/libpng/libpng-1.6.35.tar.gz
-    $ tar xvzf libpng-1.6.35.tar.gz
-    $ cd libpng-1.6.35
-    $ ./configure --prefix=/usr/arm-linux-gnueabihf --host=arm-linux-gnueabihf
-    $ make
-    $ sudo make install
-
-#### ImageMagick
-
-ImageMagick is not installed on the eOneBook, so we'll configure it to build
-as a static library.
-
-    $ wget https://imagemagick.org/download/ImageMagick.tar.gz
-    $ tar xvzf ImageMagick.tar.gz
-    $ cd ImageMagick-7.0.8-14
-    $ PKG_CONFIG_PATH=/usr/arm-linux-gnueabihf/lib/pkgconfig ./configure --host=arm-linux-gnueabihf --without-utilities --disable-openmp --disable-shared --prefix=/usr/arm-linux-gnueabihf
-    $ make
-    $ sudo make install
+    $ make install-deps
 
 ### freeonebook
 

@@ -1,2 +1,8 @@
 freeonebook
 *.o
+*.installed
+*.tar.gz
+
+deps/ImageMagick*
+deps/zlib*
+deps/libpng*
