@@ -18,13 +18,15 @@ int convert(const char *in, const char *out, int width, int height)
 	printf("reading original image\n");
 	ImageInfo *info = CloneImageInfo((ImageInfo*)NULL);
 	if (info == NULL) {
-		printf("couldn't create new ImageInfo\n");
+		printf("couldn't create new ImageInfo: ");
+		CatchException(exception);
 		return 1;
 	}
 	strcpy(info->filename, in);
 	Image *original = ReadImage(info, exception);
 	if (original == NULL) {
-		printf("couldn't read original\n");
+		printf("couldn't read original: ");
+		CatchException(exception);
 		return 0;
 	}
 
@@ -32,7 +34,8 @@ int convert(const char *in, const char *out, int width, int height)
 	Image *resized = ResizeImage(original, width, height, LanczosFilter, exception);
 	DestroyImage(original);
 	if (resized == NULL) {
-		printf("couldn't resize\n");
+		printf("couldn't resize: ");
+		CatchException(exception);
 		return 0;
 	}
 
@@ -40,13 +43,18 @@ int convert(const char *in, const char *out, int width, int height)
 	Image *rotated = IntegralRotateImage(resized, 3, exception);
 	DestroyImage(resized);
 	if (rotated == NULL) {
-		printf("couldn't rotate\n");
+		printf("couldn't rotate: ");
+		CatchException(exception);
 		return 0;
 	}
 
 	printf("writing grayscale\n");
 	strcpy(info->filename, out);
-	WriteImage(info, rotated, exception);
+	if (!WriteImage(info, rotated, exception)) {
+		printf("couldn't save converted image (%s): ", out);
+		CatchException(exception);
+		return 0;
+	}
 
 	printf("cleaning up\n");
 	DestroyImage(rotated);
