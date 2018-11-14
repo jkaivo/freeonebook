@@ -1,12 +1,12 @@
 CROSS=arm-linux-gnueabihf
 DEPLIBS=MagickCore libpng16 zlib
-PKGCONFIG=PKG_CONFIG_PATH=/usr/$(CROSS)/lib/pkgconfig pkg-config
+PKG_CONFIG_PATH=./deps/lib/pkgconfig
 CC=$(CROSS)-gcc
-CFLAGS=-Wall -Wextra -I. $$($(PKGCONFIG) --cflags MagickCore)
-LDFLAGS=-lpthread $$($(PKGCONFIG) --libs-only-L $(DEPLIBS))
-LDLIBS=$$($(PKGCONFIG) --libs-only-l $(DEPLIBS)) -lm
+CFLAGS=-Wall -Wextra -I. $$(PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags MagickCore)
+LDFLAGS=-lpthread $$(PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs-only-L $(DEPLIBS))
+LDLIBS=$$(PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs-only-l $(DEPLIBS)) -lm
 
-all: install-deps freeonebook
+all: freeonebook
 
 freeonebook: freeonebook.o gpio.o fb.o convert.o
 
@@ -20,9 +20,3 @@ convert.o: convert.c convert.h
 
 clean:
 	rm -f freeonebook *.o
-
-install-deps: deps.installed
-
-deps.installed:
-	cd deps; $(MAKE) all
-	touch $@
