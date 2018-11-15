@@ -7,21 +7,18 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <stdlib.h>
+
 #include <linux/mxcfb.h>
 #include <sys/ioctl.h>
 
-#define MAGICKCORE_QUANTUM_DEPTH 8
-#define MAGICKCORE_HDRI_ENABLE 0
-#include <MagickCore/MagickCore.h>
-
+#include "convert.h"
 #include "fb.h"
 #include "gpio.h"
 
-#define WAVEFORM_MODE_INIT      0x0     /* Screen goes to white (clears) */
-#define WAVEFORM_MODE_DU        0x1     /* Grey->white/grey->black */
-#define WAVEFORM_MODE_GC16      0x2     /* High fidelity (flashing) */
-#define WAVEFORM_MODE_GC4       0x3     /* Lower fidelity */
-#define WAVEFORM_MODE_A2        0x4     /* Fast black/white animation */
+#define CACHE_DIR	"/run/media/mmcblk0p1/.freeonebook"
+#define LEFT_CACHE	CACHE_DIR "/left.gray"
+#define RIGHT_CACHE	CACHE_DIR "/right.gray"
 
 static struct {
 	int fd;
@@ -37,7 +34,7 @@ static void fb_update(int x, int y, int w, int h)
 	marker++;
 
 	struct mxcfb_update_data data = {
-		.update_mode = UPDATE_MODE_PARTIAL,
+		.update_mode = UPDATE_MODE_FULL,
 		.waveform_mode = WAVEFORM_MODE_AUTO,
 		.update_region.left = x,
 		.update_region.top = y,
@@ -47,9 +44,18 @@ static void fb_update(int x, int y, int w, int h)
 		.temp = TEMP_USE_AMBIENT,
 		.flags = 0,
 	};
+
 	printf("SEND_UPDATE: "); fflush(NULL); sync();
-	int r = ioctl(fb.fd, MXCFB_SEND_UPDATE, &data);
+	int r = -1;
+	int retries = 5;
+	do {
+		r = ioctl(fb.fd, MXCFB_SEND_UPDATE, &data);
+		printf("%d;", r);
+	} while (r == -1 && sleep(1) != INT_MAX && --retries > 0);
 	printf("%d\n", r); fflush(NULL); sync();
+	if (r == -1) {
+		perror("SEND_UPDATE");
+	}
 
 	struct mxcfb_update_marker_data md = {
 		.update_marker = marker,
@@ -67,38 +73,48 @@ void fb_blank(void)
 
 void fb_loadimage(int screen, const char *path)
 {
-	printf("loading image %s\n", path);
-	convert(path, "/tmp/image.gray", fb.vsi.xres, fb.vsi.yres);
-	fflush(NULL); sync();
+	const char *cache = screen == LEFT_SCREEN ? LEFT_CACHE : RIGHT_CACHE;
+	struct stat st;
+	stat(path, &st);
 
-	int fd = open("/tmp/image.gray", O_RDONLY);
+	if (st.st_size != fb.vsi.xres * fb.vsi.yres) {
+		mkdir(CACHE_DIR, 0755);
+		printf("converting image\n");
+		convert(path, cache, fb.vsi.xres, fb.vsi.yres);
+		path = cache;
+	} else {
+		/* copy to cache */
+	}
+
+	int fd = open(path, O_RDONLY);
 	if (fd == -1) {
-		printf("not found\n");
-		fflush(NULL);
-		sync();
+		perror(path);
 		return;
 	}
 
-	struct stat st;
 	fstat(fd, &st);
 
+	printf("mapping %zd bytes\n", st.st_size);
+		fflush(NULL); sync();
 	char *img = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if (img == MAP_FAILED) {
-		printf("map failed\n");
-		fflush(NULL);
-		sync();
+		perror("mmap of image");
 		return;
 	}
 
 	printf("copying image..."); fflush(NULL); sync();
 	unsigned char *buffer = fb.addr + (screen * fb.size / 2);
+	for (int y = 0; y < fb.vsi.yres; y++) {
+		memcpy(buffer + (y * fb.vsi.xres_virtual), img + (y * fb.vsi.xres), fb.vsi.xres);
+	}
 	memcpy(buffer, img, st.st_size);
 	printf("done\n"); fflush(NULL); sync();
 
 	munmap(img, st.st_size);
+
 	close(fd);
 
-	fb_update(0, (screen * fb.vsi.yres_virtual / 2), fb.vsi.xres_virtual, fb.vsi.yres_virtual / 2);
+	fb_update(0, 0, fb.vsi.xres, fb.vsi.yres);
 }
 
 void fb_init(void)
@@ -117,7 +133,4 @@ void fb_init(void)
 
 	fb.size = fb.vsi.xres_virtual * fb.vsi.yres_virtual;
 	fb.addr = mmap(NULL, fb.size, PROT_READ | PROT_WRITE, MAP_SHARED, fb.fd, 0);
-
-	fb_update(0, 0, fb.vsi.xres_virtual, fb.vsi.yres_virtual);
-
 }
