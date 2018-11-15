@@ -66,7 +66,6 @@ static void *gpio_watch_thread(void *arg)
 
 void gpio_watch(int port, void (*fn)(int))
 {
-	printf("starting watcher for %d\n", port);
 	gpio_enable(port, "in");
 
 	int edge = gpio_open(port, "edge", O_WRONLY);
