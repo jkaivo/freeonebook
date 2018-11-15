@@ -1,8 +1,8 @@
 CROSS=arm-linux-gnueabihf
-DEPLIBS=MagickCore libpng16 zlib
+DEPLIBS=MagickWand libpng16 zlib
 PKG_CONFIG_PATH=./deps/lib/pkgconfig
 CC=$(CROSS)-gcc
-CFLAGS=-Wall -Wextra -I. $$(PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags MagickCore)
+CFLAGS=-Wall -Wextra -I. $$(PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags MagickWand)
 LDFLAGS=-lpthread $$(PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs-only-L $(DEPLIBS))
 LDLIBS=$$(PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs-only-l $(DEPLIBS)) -lm
 
