@@ -10,8 +10,22 @@ int convert(const char *in, const char *out, int width, int height)
 
 	if (!IsMagickWandInstantiated()) {
 		MagickWandGenesis();
+	}
+
+	if (w == NULL) {
 		w = NewMagickWand();
+		if (w == NULL) {
+			printf("couldn't create MagickWand\n");
+			return 1;
+		}
+	}
+
+	if (pixel == NULL) {
 		pixel = NewPixelWand();
+		if (pixel == NULL) {
+			printf("couldn't create PixelWand\n");
+			return 1;
+		}
 	}
 
 	if (!MagickReadImage(w, in)) {
